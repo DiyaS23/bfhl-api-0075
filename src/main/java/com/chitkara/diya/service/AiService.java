@@ -3,7 +3,12 @@ package com.chitkara.diya.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
@@ -15,55 +20,45 @@ public class AiService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    private final WebClient webClient = WebClient.create(
-            "https://generativelanguage.googleapis.com"
-    );
+    private final RestTemplate restTemplate;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    public AiService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     public String ask(String question) {
 
+        String url =
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
+
         Map<String, Object> requestBody = Map.of(
                 "contents", List.of(
-                        Map.of(
-                                "parts", List.of(
-                                        Map.of("text", question)
-                                )
-                        )
+                        Map.of("parts", List.of(
+                                Map.of("text", question)
+                        ))
                 )
         );
 
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-
-        String response = webClient.post()
-                .uri("/v1beta/models/gemini-pro:generateContent?key=" + apiKey)
-                .header("Content-Type", "application/json")
-                .bodyValue(requestBody)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        if (response == null) {
-            throw new RuntimeException("AI response is null");
-        }
+        HttpEntity<Map<String, Object>> entity =
+                new HttpEntity<>(requestBody, headers);
 
         try {
-            JsonNode root = mapper.readTree(response);
+            ResponseEntity<Map> response =
+                    restTemplate.postForEntity(url, entity, Map.class);
 
-            String answer = root
-                    .path("candidates")
-                    .get(0)
-                    .path("content")
-                    .path("parts")
-                    .get(0)
-                    .path("text")
-                    .asText();
+            List<Map> candidates = (List<Map>) response.getBody().get("candidates");
+            Map content = (Map) candidates.get(0).get("content");
+            List<Map> parts = (List<Map>) content.get("parts");
 
-            return answer.split("\\s+")[0];
+            // single-word response as required
+            return parts.get(0).get("text").toString().trim().split("\\s+")[0];
 
         } catch (Exception e) {
-            throw new RuntimeException("AI parsing failed");
+            // graceful failure
+            throw new RuntimeException("AI service unavailable");
         }
     }
-
 }

@@ -1,7 +1,5 @@
 package com.chitkara.diya.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -9,7 +7,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 import java.util.Map;
@@ -53,11 +50,9 @@ public class AiService {
             Map content = (Map) candidates.get(0).get("content");
             List<Map> parts = (List<Map>) content.get("parts");
 
-            // single-word response as required
             return parts.get(0).get("text").toString().trim().split("\\s+")[0];
 
         } catch (Exception e) {
-            // graceful failure
             throw new RuntimeException("AI service unavailable");
         }
     }
